@@ -36,16 +36,16 @@ func Register(cfg *config.Config) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "人机验证失败: " + err.Error()})
 				return
 			}
-		}
 
-		if err := service.CreateCNAME(cfg, req.Subdomain); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建 DNS 记录失败: " + err.Error()})
-			return
-		}
+			if err := service.CreateCNAME(cfg, req.Subdomain); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "创建 DNS 记录失败: " + err.Error()})
+				return
+			}
 
-		if err := service.CreateTenant(cfg, req.Subdomain, req.Username, req.Password, req.School, req.Grade, req.Class); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建租户失败: " + err.Error()})
-			return
+			if err := service.CreateTenant(cfg, req.Subdomain, req.Username, req.Password, req.School, req.Grade, req.Class); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "创建租户失败: " + err.Error()})
+				return
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{
