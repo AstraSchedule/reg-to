@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"reg-to/config"
+	"strings"
 	"time"
 )
 
@@ -87,5 +88,6 @@ func readFileContent(path string) ([]byte, error) {
 	if len(path) > 1 && (path[0] == '/' || path[1] == ':') {
 		return os.ReadFile(path)
 	}
-	return []byte(path), nil
+	// 环境变量中的 \n 是字面字符，需要转换为真正的换行符
+	return []byte(strings.ReplaceAll(path, "\\n", "\n")), nil
 }
