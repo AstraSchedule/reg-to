@@ -13,8 +13,13 @@ func main() {
 	cfg := config.Load()
 	r := gin.Default()
 
+	allowOrigins := []string{"*"}
+	if !cfg.Dev {
+		allowOrigins = []string{"https://getastra.cn"}
+	}
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     allowOrigins,
 		AllowMethods:     []string{"GET", "POST"},
 		AllowHeaders:     []string{"Content-Type"},
 		AllowCredentials: true,
