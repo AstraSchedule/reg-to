@@ -4,6 +4,7 @@ import "os"
 
 type Config struct {
 	Port               string
+	Dev                bool
 	TurnstileSecretKey string
 	CFAPIToken         string
 	CFZoneID           string
@@ -14,6 +15,7 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		Port:               getEnv("PORT", "8080"),
+		Dev:                os.Getenv("DEV") == "true",
 		TurnstileSecretKey: os.Getenv("TURNSTILE_SECRET_KEY"),
 		CFAPIToken:         os.Getenv("CF_API_TOKEN"),
 		CFZoneID:           os.Getenv("CF_ZONE_ID"),
