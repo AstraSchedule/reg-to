@@ -1,0 +1,156 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "AstraReg-Go",
+    "description": "星程课表 SaaS 注册站后端 API。提供子域名可用性检查和新租户注册功能。",
+    "version": "1.0.0"
+  },
+  "tags": [
+    { "name": "check", "description": "子域名可用性检查" },
+    { "name": "register", "description": "新租户注册" }
+  ],
+  "paths": {
+    "/api/check-subdomain/{subdomain}": {
+      "get": {
+        "summary": "检查子域名可用性",
+        "operationId": "checkSubdomain",
+        "tags": ["check"],
+        "parameters": [
+          {
+            "name": "subdomain",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" },
+            "description": "子域名，仅小写字母、数字和连字符"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "检查结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["available", "message"],
+                  "properties": {
+                    "available": { "type": "boolean" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "格式错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available": { "type": "boolean", "example": false },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/register": {
+      "post": {
+        "summary": "注册新租户",
+        "description": "提交注册请求，依次完成 Turnstile 验证、DNS 记录创建、租户初始化（管理员 + 学校结构）。Dev 模式跳过 Turnstile 和实际创建。",
+        "operationId": "register",
+        "tags": ["register"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["subdomain", "username", "password", "school", "grade", "class", "turnstile_token"],
+                "properties": {
+                  "subdomain": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+                    "description": "子域名"
+                  },
+                  "username": {
+                    "type": "string",
+                    "minLength": 3,
+                    "description": "管理员用户名"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "description": "管理员密码"
+                  },
+                  "school": {
+                    "type": "string",
+                    "description": "学校名称"
+                  },
+                  "grade": {
+                    "type": "string",
+                    "description": "年级名称"
+                  },
+                  "class": {
+                    "type": "string",
+                    "description": "班级名称"
+                  },
+                  "turnstile_token": {
+                    "type": "string",
+                    "description": "Cloudflare Turnstile 验证 token（Dev 模式可为空）"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注册成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "success" },
+                    "message": { "type": "string", "example": "注册成功" },
+                    "url": { "type": "string", "description": "新租户访问地址", "example": "https://school-a.getastra.cn" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误或 Turnstile 验证失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "DNS 创建失败或租户创建失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
