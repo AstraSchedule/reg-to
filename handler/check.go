@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"reg-to/config"
+	"reg-to/service"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -102,7 +103,12 @@ func checkDB(cfg *config.Config, subdomain string) (bool, error) {
 	}
 	req.Header.Set("X-Internal-Secret", cfg.AstraAPISecret)
 
-	resp, err := http.DefaultClient.Do(req)
+	transport, err := service.BuildMTLSTransport(cfg)
+	if err != nil {
+		return false, err
+	}
+	client := &http.Client{Transport: transport}
+	resp, err := client.Do(req)
 	if err != nil {
 		return false, err
 	}

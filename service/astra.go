@@ -37,7 +37,7 @@ func CreateTenant(cfg *config.Config, subdomain, username, password, school, gra
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Internal-Secret", cfg.AstraAPISecret)
 
-	transport, err := buildMTLSTransport(cfg)
+	transport, err := BuildMTLSTransport(cfg)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func CreateTenant(cfg *config.Config, subdomain, username, password, school, gra
 	return nil
 }
 
-func buildMTLSTransport(cfg *config.Config) (*http.Transport, error) {
+func BuildMTLSTransport(cfg *config.Config) (*http.Transport, error) {
 	transport := &http.Transport{}
 
 	if cfg.TLSCert == "" || cfg.TLSKey == "" {
