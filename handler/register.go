@@ -15,7 +15,7 @@ type RegisterRequest struct {
 	School         string `json:"school" binding:"required"`
 	Grade          string `json:"grade" binding:"required"`
 	Class          string `json:"class" binding:"required"`
-	TurnstileToken string `json:"turnstile_token" binding:"required"`
+	TurnstileToken string `json:"turnstile_token"`
 }
 
 func Register(cfg *config.Config) gin.HandlerFunc {
