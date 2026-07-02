@@ -28,7 +28,10 @@ func main() {
 	r.GET("/api/check-subdomain/:subdomain", handler.CheckSubdomain(cfg))
 	r.POST("/api/register", handler.Register(cfg))
 
-	log.Printf("Server starting on :%s", cfg.Port)
+	log.Printf("Server starting on :%s (dev=%v)", cfg.Port, cfg.Dev)
+	if !cfg.Dev && (cfg.TLSCert == "" || cfg.TLSKey == "") {
+		log.Println("WARNING: TLS_CERT/TLS_KEY not set, mTLS will not be used")
+	}
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatal(err)
 	}
