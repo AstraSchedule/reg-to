@@ -1,0 +1,4 @@
+bootstrap
+*.exe
+.env
+env.sh
