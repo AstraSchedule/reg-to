@@ -10,6 +10,9 @@ type Config struct {
 	CFZoneID           string
 	AstraAPIBase       string
 	AstraAPISecret     string
+	TLSCert            string
+	TLSKey             string
+	TLSCACert          string
 }
 
 func Load() *Config {
@@ -21,6 +24,9 @@ func Load() *Config {
 		CFZoneID:           os.Getenv("CF_ZONE_ID"),
 		AstraAPIBase:       os.Getenv("ASTRA_API_BASE"),
 		AstraAPISecret:     os.Getenv("ASTRA_API_SECRET"),
+		TLSCert:            os.Getenv("TLS_CERT"),
+		TLSKey:             os.Getenv("TLS_KEY"),
+		TLSCACert:          os.Getenv("TLS_CA_CERT"),
 	}
 }
 
