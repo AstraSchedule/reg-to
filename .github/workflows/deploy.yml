@@ -1,0 +1,44 @@
+name: Build and Deploy Reg Backend
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Get dependencies
+        run: go mod tidy
+
+      - name: Build binary
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bootstrap
+
+      - name: Package binary
+        run: |
+          chmod 777 bootstrap
+          zip code.zip bootstrap
+
+      - name: Install Serverless Devs
+        run: npm install -g @serverless-devs/s
+
+      - name: Configure credentials
+        run: |
+          s config add \
+            --AccessKeyID "${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}" \
+            --AccessKeySecret "${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}" \
+            --access default
+
+      - name: Deploy to FC
+        run: s deploy -t s.yaml --function code -y

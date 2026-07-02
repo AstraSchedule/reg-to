@@ -1,0 +1,62 @@
+edition: 3.0.0
+name: fc3-example
+access: default
+resources:
+  fcDemo:
+    component: fc3
+    props:
+      region: cn-hongkong
+      handler: index.handler
+      diskSize: 512
+      layers:
+        - acs:fc:cn-hongkong:official:layers/Go1/versions/1
+      runtime: custom.debian10
+      cpu: 0.35
+      instanceConcurrency: 200
+      vpcConfig:
+        securityGroupId: sg-j6c4a6m66nji26dbqw2e
+        vpcId: vpc-j6c51o76xv0236adzmijw
+        vSwitchIds:
+          - vsw-j6cespq5ku7x06lqh635c
+      role: ''
+      disableOndemand: false
+      nasConfig:
+        groupId: 0
+        userId: 0
+      description: ''
+      timeout: 60
+      internetAccess: true
+      resourceGroupId: rg-acfmzyl67zuq6vy
+      instanceIsolationMode: SHARE
+      customRuntimeConfig:
+        port: 9002
+        command:
+          - ./bootstrap
+        healthCheckConfig: {}
+      logConfig:
+        enableRequestMetrics: true
+        enableInstanceMetrics: true
+        logBeginRule: DefaultRegex
+        project: serverless-cn-hongkong-9445a8af-cf34-5046-b512-1e0c4ab4849e
+        logstore: default-logs
+      functionName: AstraReg-Go
+      sessionAffinity: NONE
+      memorySize: 512
+      environmentVariables:
+      code: ./code.zip
+      triggers:
+        - triggerConfig:
+            methods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - PATCH
+            authType: function
+            disableURLInternet: false
+          triggerName: defaultTrigger
+          description: ''
+          qualifier: LATEST
+          triggerType: http
