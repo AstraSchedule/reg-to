@@ -10,22 +10,22 @@ import (
 type RegClaims struct {
 	Subdomain string `json:"subdomain"`
 	Username  string `json:"username"`
+	Password  string `json:"password"`
+	School    string `json:"school"`
+	Grade     string `json:"grade"`
+	Class     string `json:"class"`
 	jwt.RegisteredClaims
 }
 
 // SignRegToken 签发注册令牌，有效期 10 分钟
-func SignRegToken(secret, subdomain, username string) (string, error) {
-	claims := RegClaims{
-		Subdomain: subdomain,
-		Username:  username,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(10 * time.Minute)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "reg-to",
-		},
+func SignRegToken(secret string, req *RegClaims) (string, error) {
+	req.RegisteredClaims = jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(10 * time.Minute)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Issuer:    "reg-to",
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, req)
 	return token.SignedString([]byte(secret))
 }
 

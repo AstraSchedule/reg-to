@@ -8,12 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SignToken 第一步：Turnstile 验证 + InternalSecret → 签发 JWT
+// SignToken 第一步：Turnstile 验证 + InternalSecret → 签发 JWT（含注册信息）
 func SignToken(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Subdomain      string `json:"subdomain" binding:"required"`
-			Username       string `json:"username" binding:"required"`
+			service.RegClaims
 			TurnstileToken string `json:"turnstile_token"`
 			InternalSecret string `json:"internal_secret" binding:"required"`
 		}
@@ -41,7 +40,7 @@ func SignToken(cfg *config.Config) gin.HandlerFunc {
 			}
 		}
 
-		token, err := service.SignRegToken(cfg.AstraAPISecret, req.Subdomain, req.Username)
+		token, err := service.SignRegToken(cfg.AstraAPISecret, &req.RegClaims)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "签发令牌失败"})
 			return
