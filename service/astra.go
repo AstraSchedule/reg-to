@@ -30,6 +30,9 @@ func CreateTenant(cfg *config.Config, subdomain, username, password, school, gra
 	body, _ := json.Marshal(payload)
 	url := cfg.AstraAPIBase + "/web/admin/register-tenant"
 
+	log.Printf("[CreateTenant] POST %s", url)
+	log.Printf("[CreateTenant] X-Internal-Secret length=%d", len(cfg.AstraAPISecret))
+
 	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -50,8 +53,11 @@ func CreateTenant(cfg *config.Config, subdomain, username, password, school, gra
 	}
 	defer resp.Body.Close()
 
+	log.Printf("[CreateTenant] Response status=%d", resp.StatusCode)
+
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(resp.Body)
+		log.Printf("[CreateTenant] Response body: %s", string(respBody))
 		return fmt.Errorf("status %d: %s", resp.StatusCode, string(respBody))
 	}
 
