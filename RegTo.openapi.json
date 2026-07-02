@@ -152,5 +152,8 @@
         }
       }
     }
-  }
+  },
+  "servers": [
+    { "url": "https://to.getastra.cn" }
+  ]
 }
