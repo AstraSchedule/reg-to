@@ -21,6 +21,8 @@ func main() {
 	}))
 
 	r.GET("/api/check-subdomain/:subdomain", handler.CheckSubdomain(cfg))
+	r.POST("/api/sign-token", handler.SignToken(cfg))
+	r.POST("/api/create-dns", handler.CreateDNS(cfg))
 	r.POST("/api/register", handler.Register(cfg))
 
 	log.Printf("Server starting on :%s (dev=%v)", cfg.Port, cfg.Dev)
