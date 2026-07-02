@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"reg-to/config"
-	"strings"
 	"time"
 )
 
@@ -62,8 +62,11 @@ func BuildMTLSTransport(cfg *config.Config) (*http.Transport, error) {
 	transport := &http.Transport{}
 
 	if cfg.TLSCert == "" || cfg.TLSKey == "" {
+		log.Println("[mTLS] TLS_CERT/TLS_KEY not set, skipping mTLS")
 		return transport, nil
 	}
+
+	log.Printf("[mTLS] TLS_CERT length=%d, TLS_KEY length=%d", len(cfg.TLSCert), len(cfg.TLSKey))
 
 	certPEM, err := readFileContent(cfg.TLSCert)
 	if err != nil {
@@ -74,11 +77,15 @@ func BuildMTLSTransport(cfg *config.Config) (*http.Transport, error) {
 		return nil, fmt.Errorf("加载客户端私钥失败: %w", err)
 	}
 
+	log.Printf("[mTLS] certPEM length=%d, keyPEM length=%d", len(certPEM), len(keyPEM))
+	log.Printf("[mTLS] certPEM first 50 bytes: %q", certPEM[:min(50, len(certPEM))])
+
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		return nil, fmt.Errorf("解析客户端证书失败: %w", err)
 	}
 
+	log.Println("[mTLS] Client certificate loaded successfully")
 	transport.TLSClientConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	return transport, nil
 }
@@ -88,6 +95,5 @@ func readFileContent(path string) ([]byte, error) {
 	if len(path) > 1 && (path[0] == '/' || path[1] == ':') {
 		return os.ReadFile(path)
 	}
-	// 环境变量中的 \n 是字面字符，需要转换为真正的换行符
-	return []byte(strings.ReplaceAll(path, "\\n", "\n")), nil
+	return []byte(path), nil
 }
