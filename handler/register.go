@@ -31,9 +31,11 @@ func Register(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		if err := service.VerifyTurnstile(cfg.TurnstileSecretKey, req.TurnstileToken, c.ClientIP()); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "人机验证失败: " + err.Error()})
-			return
+		if cfg.TurnstileSecretKey != "" {
+			if err := service.VerifyTurnstile(cfg.TurnstileSecretKey, req.TurnstileToken, c.ClientIP()); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "人机验证失败: " + err.Error()})
+				return
+			}
 		}
 
 		if err := service.CreateTenant(cfg, req.Subdomain, req.Username, req.Password, req.School, req.Grade, req.Class); err != nil {
