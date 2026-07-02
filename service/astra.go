@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -79,19 +78,7 @@ func buildMTLSTransport(cfg *config.Config) (*http.Transport, error) {
 		return nil, fmt.Errorf("解析客户端证书失败: %w", err)
 	}
 
-	tlsCfg := &tls.Config{Certificates: []tls.Certificate{cert}}
-
-	if cfg.TLSCACert != "" {
-		caPEM, err := readFileContent(cfg.TLSCACert)
-		if err != nil {
-			return nil, fmt.Errorf("加载 CA 证书失败: %w", err)
-		}
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caPEM)
-		tlsCfg.RootCAs = caCertPool
-	}
-
-	transport.TLSClientConfig = tlsCfg
+	transport.TLSClientConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	return transport, nil
 }
 

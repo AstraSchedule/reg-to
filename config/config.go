@@ -12,7 +12,6 @@ type Config struct {
 	AstraAPISecret     string
 	TLSCert            string
 	TLSKey             string
-	TLSCACert          string
 }
 
 func Load() *Config {
@@ -26,7 +25,6 @@ func Load() *Config {
 		AstraAPISecret:     os.Getenv("ASTRA_API_SECRET"),
 		TLSCert:            os.Getenv("TLS_CERT"),
 		TLSKey:             os.Getenv("TLS_KEY"),
-		TLSCACert:          os.Getenv("TLS_CA_CERT"),
 	}
 }
 
