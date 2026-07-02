@@ -15,7 +15,7 @@ func main() {
 
 	allowOrigins := []string{"*"}
 	if !cfg.Dev {
-		allowOrigins = []string{"https://getastra.cn"}
+		allowOrigins = []string{"https://go.getastra.cn"}
 	}
 
 	r.Use(cors.New(cors.Config{
