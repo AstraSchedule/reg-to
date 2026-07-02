@@ -14,7 +14,7 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		Port:               getEnv("PORT", "8080"),
+		Port:               getEnv("PORT", "9002"),
 		Dev:                os.Getenv("GIN_MODE") != "release",
 		TurnstileSecretKey: os.Getenv("TURNSTILE_SECRET_KEY"),
 		CFAPIToken:         os.Getenv("CF_API_TOKEN"),
