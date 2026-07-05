@@ -31,12 +31,10 @@ func SignToken(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		if !cfg.Dev {
-			if cfg.TurnstileSecretKey != "" {
-				if err := service.VerifyTurnstile(cfg.TurnstileSecretKey, req.TurnstileToken, c.ClientIP()); err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "人机验证失败: " + err.Error()})
-					return
-				}
+		if !cfg.Dev && cfg.TurnstileSecretKey != "" {
+			if err := service.VerifyTurnstile(cfg.TurnstileSecretKey, req.TurnstileToken, c.ClientIP()); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "人机验证失败: " + err.Error()})
+				return
 			}
 		}
 
