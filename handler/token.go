@@ -8,23 +8,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SignToken 第一步：Turnstile 验证 + InternalSecret → 签发 JWT（含注册信息）
+// SignToken 第一步：Turnstile 验证 → 签发 JWT（含注册信息）
 func SignToken(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			service.RegClaims
 			TurnstileToken string `json:"turnstile_token"`
-			InternalSecret string `json:"internal_secret" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "参数不完整"})
 			return
 		}
 
-		if req.InternalSecret != cfg.AstraAPISecret {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "内部认证失败"})
-			return
-		}
+		// 安全修复：移除 internal_secret 校验。
+		// 该密钥此前被硬编码在注册页前端 JS 中并已进入 git 历史（公开泄露），
+		// 浏览器端认证无法保密；注册接口以 Turnstile 人机验证作为门卫。
+		// 若未来需要服务间强认证，应改走服务端到服务端的专用通道。
 
 		if !subdomainRegex.MatchString(req.Subdomain) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "子域名格式不正确"})
