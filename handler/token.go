@@ -2,44 +2,37 @@ package handler
 
 import (
 	"net/http"
-	"reg-to/config"
+
 	"reg-to/service"
 
 	"github.com/gin-gonic/gin"
 )
 
-// SignToken 第一步：Turnstile 验证 → 签发 JWT（含注册信息）
-func SignToken(cfg *config.Config) gin.HandlerFunc {
+// SignToken 第一步：人机验证 → 签发注册 JWT（内含注册信息）。
+func SignToken(deps *Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req struct {
-			service.RegClaims
-			TurnstileToken string `json:"turnstile_token"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "参数不完整"})
+		input, ok := deps.bindRegisterInput(c)
+		if !ok {
 			return
 		}
 
-		// 安全修复：移除 internal_secret 校验。
-		// 该密钥此前被硬编码在注册页前端 JS 中并已进入 git 历史（公开泄露），
-		// 浏览器端认证无法保密；注册接口以 Turnstile 人机验证作为门卫。
-		// 若未来需要服务间强认证，应改走服务端到服务端的专用通道。
-
-		if !subdomainRegex.MatchString(req.Subdomain) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "子域名格式不正确"})
+		if err := deps.VerifyHuman(c, input.TurnstileToken); err != nil {
+			rejectHuman(c, err)
 			return
 		}
 
-		if !cfg.Dev && cfg.TurnstileSecretKey != "" {
-			if err := service.VerifyTurnstile(cfg.TurnstileSecretKey, req.TurnstileToken, c.ClientIP()); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "人机验证失败: " + err.Error()})
-				return
-			}
+		claims := &service.RegClaims{
+			Subdomain: input.Subdomain,
+			Username:  input.Username,
+			School:    input.School,
+			Grade:     input.Grade,
+			Class:     input.Class,
 		}
 
-		token, err := service.SignRegToken(cfg.AstraAPISecret, &req.RegClaims)
+		// 明文口令只作为加密的输入，不会写入令牌本身。
+		token, err := service.SignRegToken(deps.Config.AstraAPISecret, claims, input.Password)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "签发令牌失败"})
+			internalError(c, "签发令牌失败，请稍后重试", err)
 			return
 		}
 
@@ -50,8 +43,8 @@ func SignToken(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
-// CreateDNS 第三步：验证 JWT → 创建 DNS 记录
-func CreateDNS(cfg *config.Config) gin.HandlerFunc {
+// CreateDNS 第三步：验证 JWT → 向全部已配置服务商写入 DNS 记录。
+func CreateDNS(deps *Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Token string `json:"token" binding:"required"`
@@ -61,21 +54,18 @@ func CreateDNS(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		claims, err := service.VerifyRegToken(cfg.AstraAPISecret, req.Token)
+		claims, err := service.VerifyRegToken(deps.Config.AstraAPISecret, req.Token)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "令牌无效: " + err.Error()})
+			// 不向调用方回显 JWT 解析细节，避免泄露内部实现。
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "注册令牌无效或已过期，请重新提交注册"})
 			return
 		}
 
-		if err := service.CreateCNAME(cfg, claims.Subdomain); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建 DNS 记录失败: " + err.Error()})
+		if msg := deps.validateSubdomain(claims.Subdomain); msg != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": msg})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "success",
-			"message": "DNS 记录已创建",
-			"url":     "https://" + claims.Subdomain + ".getastra.cn",
-		})
+		deps.writeDNS(c, claims.Subdomain)
 	}
 }
