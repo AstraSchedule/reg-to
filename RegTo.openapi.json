@@ -2,18 +2,20 @@
   "openapi": "3.0.1",
   "info": {
     "title": "AstraReg-Go",
-    "description": "星程课表 SaaS 注册站后端 API。提供子域名可用性检查、JWT 签发和 DNS 记录创建。",
-    "version": "1.1.0"
+    "description": "星程课表 SaaS 注册站后端 API。提供子域名可用性检查、JWT 签发与多 DNS 服务商记录创建。\n\n支持同时配置多个 DNS 服务商（Cloudflare、阿里云云解析、阿里云 ESA）：一次注册会向全部已启用的服务商幂等写入记录，并按服务商粒度返回结果。未配置的服务商会被自动跳过并在 `providers` 中以 `skipped` 上报。",
+    "version": "2.0.0"
   },
   "tags": [
     { "name": "check", "description": "子域名可用性检查" },
     { "name": "token", "description": "JWT 签发" },
-    { "name": "dns", "description": "DNS 记录创建" }
+    { "name": "dns", "description": "DNS 记录创建" },
+    { "name": "register", "description": "一步式注册" }
   ],
   "paths": {
     "/api/check-subdomain/{subdomain}": {
       "get": {
         "summary": "检查子域名可用性",
+        "description": "依次检查全部已启用的 DNS 服务商与 Astra 后端的命名空间占用情况。\n\n任一环节无法完成校验时返回 `available=false` 且 `degraded=true`（fail-closed），避免用户走完注册流程后才发现记录创建失败。",
         "operationId": "checkSubdomain",
         "tags": ["check"],
         "parameters": [
@@ -21,8 +23,8 @@
             "name": "subdomain",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" },
-            "description": "子域名，仅小写字母、数字和连字符"
+            "schema": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$" },
+            "description": "子域名，仅小写字母、数字和连字符，长度 1~63，且不能是系统保留名称"
           }
         ],
         "responses": {
@@ -35,7 +37,15 @@
                   "required": ["available", "message"],
                   "properties": {
                     "available": { "type": "boolean" },
-                    "message": { "type": "string" }
+                    "message": { "type": "string" },
+                    "degraded": {
+                      "type": "boolean",
+                      "description": "为 true 表示存在服务商未能完成校验，此时 available 恒为 false"
+                    },
+                    "providers": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/ProviderOutcome" }
+                    }
                   }
                 }
               }
@@ -47,7 +57,7 @@
     "/api/sign-token": {
       "post": {
         "summary": "签发注册 JWT",
-        "description": "第一步：Turnstile 验证 + InternalSecret 验证 → 签发 JWT（含完整注册信息）。Dev 模式跳过 Turnstile。",
+        "description": "第一步：人机验证（Turnstile）通过后签发 JWT，有效期 10 分钟。\n\n生产环境未配置 `TURNSTILE_SECRET_KEY` 时直接拒绝（fail-closed），不会跳过人机验证。",
         "operationId": "signToken",
         "tags": ["token"],
         "requestBody": {
@@ -56,16 +66,15 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["subdomain", "username", "password", "school", "grade", "class", "internal_secret"],
+                "required": ["subdomain", "username", "password", "school", "grade", "class"],
                 "properties": {
-                  "subdomain": { "type": "string", "description": "子域名" },
-                  "username": { "type": "string", "description": "管理员用户名" },
-                  "password": { "type": "string", "description": "管理员密码" },
-                  "school": { "type": "string", "description": "学校名称" },
-                  "grade": { "type": "string", "description": "年级名称" },
-                  "class": { "type": "string", "description": "班级名称" },
-                  "turnstile_token": { "type": "string", "description": "Cloudflare Turnstile token（Dev 模式可为空）" },
-                  "internal_secret": { "type": "string", "description": "内部认证密钥" }
+                  "subdomain": { "type": "string", "description": "子域名，小写字母/数字/连字符，1~63 字符，非保留名" },
+                  "username": { "type": "string", "description": "管理员用户名，3~32 字符" },
+                  "password": { "type": "string", "description": "管理员密码，8~128 字符" },
+                  "school": { "type": "string", "description": "学校名称，1~32 字符" },
+                  "grade": { "type": "string", "description": "年级名称，1~32 字符" },
+                  "class": { "type": "string", "description": "班级名称，1~32 字符" },
+                  "turnstile_token": { "type": "string", "description": "Cloudflare Turnstile 令牌；开发模式可为空" }
                 }
               }
             }
@@ -79,22 +88,22 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "token": { "type": "string", "description": "注册 JWT（有效期 10 分钟）" },
+                    "token": { "type": "string", "description": "注册 JWT（HS256，有效期 10 分钟）" },
                     "status": { "type": "string", "example": "success" }
                   }
                 }
               }
             }
           },
-          "400": { "description": "参数错误或 Turnstile 验证失败" },
-          "401": { "description": "InternalSecret 不匹配" }
+          "400": { "description": "参数校验失败或人机验证未通过" },
+          "500": { "description": "签发令牌失败（如签名密钥未配置）" }
         }
       }
     },
     "/api/create-dns": {
       "post": {
         "summary": "创建 DNS 记录",
-        "description": "第三步：验证 JWT 签名 → 创建 Cloudflare CNAME 记录。",
+        "description": "第三步：校验 JWT 签名、签发者与有效期后，向全部已启用的 DNS 服务商幂等写入 CNAME 记录。\n\n写入是幂等的：记录已存在且内容一致时不改动，内容不一致时更新。\n\n状态码：\n- `200` 全部成功，或部分成功（此时 `warnings` 非空）\n- `502` 全部已启用服务商写入失败\n- `503` 未配置任何 DNS 服务商",
         "operationId": "createDNS",
         "tags": ["dns"],
         "requestBody": {
@@ -113,22 +122,127 @@
         },
         "responses": {
           "200": {
-            "description": "DNS 创建成功",
+            "description": "DNS 记录已创建（可能为部分成功）",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": { "type": "string", "example": "success" },
-                    "message": { "type": "string" },
-                    "url": { "type": "string", "description": "新租户访问地址" }
-                  }
-                }
+                "schema": { "$ref": "#/components/schemas/DnsWriteResult" }
               }
             }
           },
-          "401": { "description": "JWT 无效" },
-          "500": { "description": "DNS 创建失败" }
+          "400": { "description": "参数不完整或令牌中的子域名不合法" },
+          "401": { "description": "注册令牌无效或已过期" },
+          "502": { "description": "全部已启用服务商写入失败" },
+          "503": { "description": "未配置任何 DNS 服务商" }
+        }
+      }
+    },
+    "/api/register": {
+      "post": {
+        "summary": "一步式注册",
+        "description": "人机验证通过后，依次创建租户与全部 DNS 记录，等价于 sign-token + Astra 后端 register-tenant + create-dns。\n\n两步均为幂等操作，任一步失败后重复提交同一请求都能安全重试。",
+        "operationId": "register",
+        "tags": ["register"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["subdomain", "username", "password", "school", "grade", "class"],
+                "properties": {
+                  "subdomain": { "type": "string" },
+                  "username": { "type": "string" },
+                  "password": { "type": "string" },
+                  "school": { "type": "string" },
+                  "grade": { "type": "string" },
+                  "class": { "type": "string" },
+                  "turnstile_token": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注册成功（可能为部分成功）",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DnsWriteResult" }
+              }
+            }
+          },
+          "400": { "description": "参数校验失败或人机验证未通过" },
+          "500": { "description": "创建租户失败" },
+          "502": { "description": "全部已启用服务商写入失败" },
+          "503": { "description": "未配置任何 DNS 服务商" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DnsRecord": {
+        "type": "object",
+        "description": "单条 DNS 记录的处理结果",
+        "properties": {
+          "fqdn": { "type": "string", "example": "school.getastra.cn" },
+          "type": { "type": "string", "example": "CNAME" },
+          "value": { "type": "string", "description": "记录指向的目标地址" },
+          "line": { "type": "string", "description": "解析线路，仅云解析使用，如 default / overseas" },
+          "action": {
+            "type": "string",
+            "enum": ["created", "updated", "unchanged"],
+            "description": "本次实际发生的改动"
+          },
+          "record_id": { "type": "string", "description": "服务商侧的记录 ID" }
+        }
+      },
+      "ProviderOutcome": {
+        "type": "object",
+        "description": "单个 DNS 服务商在本次操作中的结果",
+        "properties": {
+          "provider": { "type": "string", "enum": ["cloudflare", "alidns", "esa"] },
+          "label": { "type": "string", "example": "阿里云云解析" },
+          "enabled": { "type": "boolean" },
+          "ok": { "type": "boolean" },
+          "skipped": { "type": "boolean", "description": "配置缺失被跳过" },
+          "exists": { "type": "boolean", "description": "仅检查场景使用" },
+          "public": {
+            "type": "boolean",
+            "description": "该服务商写出的域名是否作为对用户可见的访问地址；为 false 时记录照常写入，但不会出现在 urls 中"
+          },
+          "fqdn": { "type": "string" },
+          "reason": { "type": "string", "description": "被跳过的原因，列出缺失的配置项" },
+          "error": { "type": "string", "description": "失败原因" },
+          "records": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DnsRecord" }
+          }
+        }
+      },
+      "DnsWriteResult": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["success", "error"] },
+          "message": { "type": "string" },
+          "url": {
+            "type": "string",
+            "description": "主访问地址，等同 urls[0]；全部失败时不返回"
+          },
+          "urls": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "对外暴露且写入成功的访问地址，顺序即 DNS_PROVIDERS 的优先级顺序。标记为 `public=false` 的服务商（如只作回源目标的 Cloudflare）不在此列；若没有任何服务商对外暴露，则回退为全部成功域名。"
+          },
+          "warnings": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "部分服务商写入失败时的原因列表"
+          },
+          "providers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProviderOutcome" }
+          }
         }
       }
     }
