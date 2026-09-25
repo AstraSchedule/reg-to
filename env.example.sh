@@ -13,9 +13,12 @@ export TZ="Asia/Shanghai"
 # ── 人机验证（ESA AI 验证码）──────────────────────────────────────────
 # 验证由 ESA 在边缘完成，阿里云没有为 AI 验证码提供开放的服务端验签接口，
 # 因此这里没有任何密钥可配，改为两步接入：
-#   1. ESA 控制台 → AI 验证码 → 新增规则：
-#        需验签的接口 to.getastra.cn/api/sign-token，方法 POST，类型「一点即过」，
-#        并开启「拦截空Token请求」（否则没做验证的请求会直接放行）。
+#   1. ESA 控制台 → AI 验证码 → 为下面两个接口各新增一条规则（类型「一点即过」）：
+#        POST to.getastra.cn/api/sign-token
+#        POST to.getastra.cn/api/register
+#      两条规则都要开启「拦截空Token请求」，否则没做验证的请求会被直接放行。
+#      注意 /api/register 同样调用人机验证：漏配它的规则就等于留下一条
+#      「带任意非空参数即可创建租户」的旁路。
 #   2. 前端 reg-go 用 VITE_CAPTCHA_PREFIX（身份标）与 VITE_CAPTCHA_SCENE_ID（场景ID）
 #      渲染验证码，验证通过后把 captchaVerifyParam 随注册请求带回。
 # 本服务只做存在性检查（fail-closed）：缺验签参数直接拒绝，

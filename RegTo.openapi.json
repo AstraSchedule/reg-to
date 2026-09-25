@@ -60,6 +60,22 @@
         "description": "第一步：人机验证（ESA AI 验证码）通过后签发 JWT，有效期 10 分钟。\n\n验证由 ESA 在边缘完成：请求需携带验签参数（查询参数 `captcha_verify_param` 或请求头 `captcha-verify-param`，取值即前端回调的 `captchaVerifyParam`）。缺少参数时本服务直接拒绝（fail-closed）。",
         "operationId": "signToken",
         "tags": ["token"],
+        "parameters": [
+          {
+            "name": "captcha_verify_param",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "ESA AI 验证码验签参数（前端回调的 captchaVerifyParam）。生产环境必须携带：缺失时本服务直接返回 400，令牌真伪由 ESA 在边缘判定。"
+          },
+          {
+            "name": "captcha-verify-param",
+            "in": "header",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "同上的请求头写法；查询参数与请求头任一带一个即可（ESA 两种都识别）。"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -138,9 +154,25 @@
     "/api/register": {
       "post": {
         "summary": "一步式注册",
-        "description": "人机验证通过后，依次创建租户与全部 DNS 记录，等价于 sign-token + Astra 后端 register-tenant + create-dns。\n\n两步均为幂等操作，任一步失败后重复提交同一请求都能安全重试。",
+        "description": "人机验证通过后，依次创建租户与全部 DNS 记录，等价于 sign-token + Astra 后端 register-tenant + create-dns。\n\n两步均为幂等操作，任一步失败后重复提交同一请求都能安全重试。\n\n人机验证与 sign-token 相同：需携带验签参数，缺少时返回 400（fail-closed）。",
         "operationId": "register",
         "tags": ["register"],
+        "parameters": [
+          {
+            "name": "captcha_verify_param",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "ESA AI 验证码验签参数（前端回调的 captchaVerifyParam）。生产环境必须携带：缺失时本服务直接返回 400，令牌真伪由 ESA 在边缘判定。"
+          },
+          {
+            "name": "captcha-verify-param",
+            "in": "header",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "同上的请求头写法；查询参数与请求头任一带一个即可（ESA 两种都识别）。"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
