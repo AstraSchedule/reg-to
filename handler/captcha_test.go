@@ -40,7 +40,7 @@ func TestRequireCaptcha(t *testing.T) {
 			}
 
 			err := deps.RequireCaptcha(c)
-			if got := errors.Is(err, ErrCaptchaMissing); got != tc.wantErr {
+			if errors.Is(err, ErrCaptchaMissing) != tc.wantErr {
 				t.Fatalf("RequireCaptcha() = %v，期望拒绝=%v", err, tc.wantErr)
 			}
 		})
