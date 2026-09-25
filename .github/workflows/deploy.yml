@@ -27,11 +27,11 @@ jobs:
 
       - name: Package binary
         run: |
-          chmod 777 bootstrap
+          chmod 755 bootstrap
           zip code.zip bootstrap
 
       - name: Install Serverless Devs
-        run: npm install -g @serverless-devs/s
+        run: npm install -g @serverless-devs/s@3.1.10 --ignore-scripts
 
       - name: Configure credentials
         run: |
