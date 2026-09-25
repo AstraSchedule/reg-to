@@ -5,23 +5,27 @@ resources:
   fcDemo:
     component: fc3
     props:
-      region: cn-hongkong
+      region: cn-shanghai
       handler: index.handler
       diskSize: 512
       layers:
-        - acs:fc:cn-hongkong:official:layers/Go1/versions/1
+        - acs:fc:cn-shanghai:official:layers/Go1/versions/1
       runtime: custom.debian10
       cpu: 0.35
       instanceConcurrency: 200
       vpcConfig:
-        securityGroupId: sg-j6c4a6m66nji26dbqw2e
-        vpcId: vpc-j6c51o76xv0236adzmijw
+        securityGroupId: sg-uf6faoi1xyw0cmx5e9y0
+        vpcId: vpc-uf69e14e6lcxj83rdyyo4
         vSwitchIds:
-          - vsw-j6cespq5ku7x06lqh635c
+          - vsw-uf6rom7ifa0d28f3hw1np
       role: ''
       disableOndemand: false
       nasConfig:
         groupId: 0
+        mountPoints:
+          - enableTLS: false
+            serverAddr: 031uce8z5bg136g4jqx-sxo89.cn-shanghai.nas.aliyuncs.com:/share/astra/
+            mountDir: /data/astra/
         userId: 0
       description: ''
       timeout: 60
@@ -37,7 +41,7 @@ resources:
         enableRequestMetrics: true
         enableInstanceMetrics: true
         logBeginRule: DefaultRegex
-        project: serverless-cn-hongkong-9445a8af-cf34-5046-b512-1e0c4ab4849e
+        project: serverless-cn-shanghai-9445a8af-cf34-5046-b512-1e0c4ab4849e
         logstore: default-logs
       functionName: AstraReg-Go
       sessionAffinity: NONE
