@@ -25,13 +25,12 @@ const (
 
 // registerInput 是注册相关的请求体。
 type registerInput struct {
-	Subdomain      string `json:"subdomain" binding:"required"`
-	Username       string `json:"username" binding:"required"`
-	Password       string `json:"password" binding:"required"`
-	School         string `json:"school" binding:"required"`
-	Grade          string `json:"grade" binding:"required"`
-	Class          string `json:"class" binding:"required"`
-	TurnstileToken string `json:"turnstile_token"`
+	Subdomain string `json:"subdomain" binding:"required"`
+	Username  string `json:"username" binding:"required"`
+	Password  string `json:"password" binding:"required"`
+	School    string `json:"school" binding:"required"`
+	Grade     string `json:"grade" binding:"required"`
+	Class     string `json:"class" binding:"required"`
 }
 
 // validateSubdomain 校验子域名格式与保留名，返回空串表示通过。

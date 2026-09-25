@@ -16,13 +16,12 @@ const (
 
 // Config 汇总全部运行时配置。
 type Config struct {
-	Port               string
-	Dev                bool
-	TurnstileSecretKey string
-	AstraAPIBase       string
-	AstraAPISecret     string
-	TLSCert            string
-	TLSKey             string
+	Port           string
+	Dev            bool
+	AstraAPIBase   string
+	AstraAPISecret string
+	TLSCert        string
+	TLSKey         string
 
 	// RequireMTLS 为 true 时，缺少客户端证书将拒绝启动，避免生产环境静默降级为无 mTLS。
 	RequireMTLS bool
@@ -297,7 +296,6 @@ func Load() *Config {
 	return &Config{
 		Port:               getEnv("PORT", "9002"),
 		Dev:                dev,
-		TurnstileSecretKey: os.Getenv("TURNSTILE_SECRET_KEY"),
 		AstraAPIBase:       os.Getenv("ASTRA_API_BASE"),
 		AstraAPISecret:     os.Getenv("ASTRA_API_SECRET"),
 		TLSCert:            os.Getenv("TLS_CERT"),
