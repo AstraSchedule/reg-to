@@ -23,6 +23,7 @@ type fakeEsaRecord struct {
 	Value      string
 	Proxied    bool
 	TTL        int
+	Comment    string
 }
 
 // fakeEsaAPI 模拟阿里云 ESA 的站点内 DNS 记录接口。
@@ -78,6 +79,7 @@ func (f *fakeEsaAPI) list(w http.ResponseWriter, r *http.Request) {
 			"Data":             map[string]any{"Value": record.Value},
 			"Proxied":          record.Proxied,
 			"Ttl":              record.TTL,
+			"Comment":          record.Comment,
 		})
 	}
 
@@ -126,6 +128,7 @@ func (f *fakeEsaAPI) create(w http.ResponseWriter, r *http.Request) {
 			Value:      f.staleValue,
 			Proxied:    r.Form.Get("Proxied") == "true",
 			TTL:        int(parseInt64(r.Form.Get("Ttl"))),
+			Comment:    r.Form.Get("Comment"),
 		})
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -147,6 +150,7 @@ func (f *fakeEsaAPI) create(w http.ResponseWriter, r *http.Request) {
 		Value:      dataValue(r.Form.Get("Data")),
 		Proxied:    r.Form.Get("Proxied") == "true",
 		TTL:        int(parseInt64(r.Form.Get("Ttl"))),
+		Comment:    r.Form.Get("Comment"),
 	}
 	f.records = append(f.records, record)
 
@@ -164,6 +168,7 @@ func (f *fakeEsaAPI) update(w http.ResponseWriter, r *http.Request) {
 		f.records[i].SourceType = r.Form.Get("SourceType")
 		f.records[i].BizName = r.Form.Get("BizName")
 		f.records[i].TTL = int(parseInt64(r.Form.Get("Ttl")))
+		f.records[i].Comment = r.Form.Get("Comment")
 		writeAliResponse(w, map[string]any{"RequestId": "req-update", "RecordId": id})
 		return
 	}
@@ -228,6 +233,41 @@ func TestESAEnsureCreatesRecord(t *testing.T) {
 	defer fake.mu.Unlock()
 	if len(fake.records) != 1 || !fake.records[0].Proxied {
 		t.Fatalf("模拟服务端记录不正确: %+v", fake.records)
+	}
+	// 租户备注是系统端（sys-backend）识别租户记录的依据，创建时必须带上。
+	if fake.records[0].Comment != TenantComment {
+		t.Fatalf("记录未带租户备注标记: %q", fake.records[0].Comment)
+	}
+}
+
+// 迁移前的历史记录没有租户备注，必须在一次 Ensure 里补上，
+// 否则系统端认不出这条记录、把它当成基础设施记录忽略掉。
+func TestESAEnsureStampsTenantComment(t *testing.T) {
+	provider, fake := newFakeEsaProvider(t, config.ESAConfig{Target: "class.getastra.cn", Proxied: true})
+
+	seedEsa(t, fake, fakeEsaRecord{
+		RecordID:   1,
+		RecordName: "nj39.getastra.cn",
+		RecordType: "CNAME",
+		SourceType: "OP",
+		BizName:    "api",
+		Value:      "class.getastra.cn",
+		Proxied:    true,
+		TTL:        30,
+	})
+
+	results, err := provider.Ensure(context.Background(), "nj39")
+	if err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+	if results[0].Action != ActionUpdated {
+		t.Fatalf("缺少租户备注时应更新记录，实际为 %s", results[0].Action)
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if fake.records[0].Comment != TenantComment {
+		t.Fatalf("备注未补上: %q", fake.records[0].Comment)
 	}
 }
 
@@ -379,6 +419,61 @@ func TestESAExists(t *testing.T) {
 	}
 	if !exists {
 		t.Fatal("记录已存在时应报告占用")
+	}
+}
+
+// 备注里可能有人工补充的信息，写入时必须保留原文：只补标记，不改写已有说明。
+func TestESAEnsurePreservesExistingComment(t *testing.T) {
+	provider, fake := newFakeEsaProvider(t, config.ESAConfig{Target: "class.getastra.cn", Proxied: true})
+	seedEsa(t, fake, fakeEsaRecord{
+		RecordID:   1,
+		RecordName: "nj39.getastra.cn",
+		RecordType: "CNAME",
+		SourceType: "OP",
+		BizName:    "api",
+		Value:      "class.getastra.cn",
+		Proxied:    true,
+		TTL:        30,
+		Comment:    "SaaS 租户 nj39",
+	})
+
+	// 改目标触发一次写回
+	updated := provider.(*esaProvider)
+	updated.cfg.Target = "class2.getastra.cn"
+
+	results, err := updated.Ensure(context.Background(), "nj39")
+	if err != nil {
+		t.Fatalf("更新失败: %v", err)
+	}
+	if results[0].Action != ActionUpdated {
+		t.Fatalf("目标变化时应更新记录: %+v", results[0])
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if fake.records[0].Comment != "SaaS 租户 nj39" {
+		t.Fatalf("人工补充的备注被改写: %q", fake.records[0].Comment)
+	}
+}
+
+// 标记只在备注开头才算数："non-SaaS" 这类反向说明不能被当成租户标记。
+func TestHasTenantMarker(t *testing.T) {
+	cases := map[string]bool{
+		"SaaS":     true,
+		"saas":     true,
+		"SaaS 租户":  true,
+		"SaaS-租户":  true,
+		"  SaaS  ": true,
+		"":         false,
+		"non-SaaS": false,
+		"租户 SaaS":  false,
+		"SaaS租户":   false,
+	}
+
+	for comment, want := range cases {
+		if got := hasTenantMarker(comment); got != want {
+			t.Fatalf("hasTenantMarker(%q) = %v，期望 %v", comment, got, want)
+		}
 	}
 }
 
