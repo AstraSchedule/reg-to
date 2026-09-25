@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -30,8 +29,6 @@ const maxPublicErrorRunes = 240
 var (
 	// ErrBackendNotConfigured 表示 Astra 后端内部接口未配置，命名空间校验被跳过。
 	ErrBackendNotConfigured = errors.New("astra 后端未配置")
-	// ErrTurnstileNotConfigured 表示缺少 Turnstile 密钥，此时必须拒绝而不是放行。
-	ErrTurnstileNotConfigured = errors.New("人机验证未配置，请联系维护者")
 )
 
 // Deps 是 handler 层共享的依赖，在进程启动时构造一次。
@@ -58,46 +55,6 @@ func NewDeps(cfg *config.Config) (*Deps, error) {
 		DNS:     manager,
 		Backend: &http.Client{Timeout: backendTimeout, Transport: transport, CheckRedirect: service.NoRedirect},
 	}, nil
-}
-
-// VerifyHuman 校验人机验证。
-//
-// 开发模式直接放行；生产环境缺少 Turnstile 密钥时返回错误，
-// 避免配置疏漏导致人机验证被静默跳过。
-func (d *Deps) VerifyHuman(c *gin.Context, token string) error {
-	if d.Config.Dev {
-		return nil
-	}
-	if d.Config.TurnstileSecretKey == "" {
-		return ErrTurnstileNotConfigured
-	}
-	return service.VerifyTurnstile(d.Config.TurnstileSecretKey, token, clientIP(c))
-}
-
-// clientIP 返回可确证的客户端 IP。
-//
-// 仅在请求确实经过可信代理（RemoteAddr 与解析出的客户端 IP 不一致）时返回该地址，
-// 否则返回空串，避免把可被 X-Forwarded-For 伪造的值传给 Turnstile。
-func clientIP(c *gin.Context) string {
-	resolved := c.ClientIP()
-	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
-	if err != nil {
-		return ""
-	}
-	if resolved == host {
-		return ""
-	}
-	return resolved
-}
-
-// rejectHuman 统一处理人机验证失败。
-//
-// 该分支可由未认证请求触发，因此不能回显上游原始错误：
-// 那会暴露服务端是否配置了 Turnstile、以及上游的报错细节。
-// 调用方只需要知道「验证未通过」，详情进服务端日志。
-func rejectHuman(c *gin.Context, err error) {
-	log.Printf("[reg-to] 人机验证未通过: %s", service.SanitizeLogLine(err.Error()))
-	c.JSON(http.StatusBadRequest, gin.H{"error": "人机验证未通过，请重试"})
 }
 
 // dnsSummary 汇总一次多服务商写入的结果，字段会被展开进响应体。

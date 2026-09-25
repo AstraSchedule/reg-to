@@ -10,9 +10,17 @@ export GIN_MODE="release"          # release 表示生产模式
 export DEV_MODE="false"            # 开发模式必须显式开启（DEV_MODE=true）；GIN_MODE=release 时强制关闭
 export TZ="Asia/Shanghai"
 
-# ── 人机验证 ──────────────────────────────────────────────────────────
-# 生产环境必须设置。缺失时注册类接口会直接拒绝（fail-closed），不会静默跳过。
-export TURNSTILE_SECRET_KEY=""
+# ── 人机验证（ESA AI 验证码）──────────────────────────────────────────
+# 验证由 ESA 在边缘完成，阿里云没有为 AI 验证码提供开放的服务端验签接口，
+# 因此这里没有任何密钥可配，改为两步接入：
+#   1. ESA 控制台 → AI 验证码 → 新增规则：
+#        需验签的接口 to.getastra.cn/api/sign-token，方法 POST，类型「一点即过」，
+#        并开启「拦截空Token请求」（否则没做验证的请求会直接放行）。
+#   2. 前端 reg-go 用 VITE_CAPTCHA_PREFIX（身份标）与 VITE_CAPTCHA_SCENE_ID（场景ID）
+#      渲染验证码，验证通过后把 captchaVerifyParam 随注册请求带回。
+# 本服务只做存在性检查（fail-closed）：缺验签参数直接拒绝，
+# 使注册入口不依赖控制台开关是否打开；令牌真伪一律由 ESA 判定。
+# 代价是绕过 ESA 直连源站的请求不受本检查保护 —— 源站不应直接对外暴露。
 
 # ── Astra 后端（内部接口）─────────────────────────────────────────────
 # 生产环境必须是 https://：该地址承载注册口令与内部共享密钥，
@@ -136,8 +144,7 @@ export ALI_ESA_ENDPOINT="esa.cn-hangzhou.aliyuncs.com"
 export ALI_ESA_PROTOCOL=""               # 留空使用 HTTPS；私有化 endpoint 可填 http
 
 # ── HTTP 边界 ─────────────────────────────────────────────────────────
-# 可信反向代理网段。留空表示不信任 X-Forwarded-For，
-# 此时不会把客户端 IP 传给 Turnstile（避免使用可伪造的值）。
+# 可信反向代理网段。留空表示不信任 X-Forwarded-For（避免使用可伪造的值）。
 export TRUSTED_PROXIES=""
 
 # 允许跨域的来源白名单，填注册页的完整 origin，例如 https://go.getastra.cn。

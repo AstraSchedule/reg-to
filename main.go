@@ -58,7 +58,7 @@ func main() {
 func corsConfig(cfg *config.Config) cors.Config {
 	conf := cors.Config{
 		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Content-Type"},
+		AllowHeaders:     []string{"Content-Type", handler.CaptchaHeaderKey},
 		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}
@@ -198,8 +198,8 @@ func reportSecrets(cfg *config.Config) {
 		log.Fatalf("[配置] ASTRA_API_SECRET 长度不足 %d 字节：该密钥同时用于 JWT 签名与口令加密，过短可被离线暴力破解。请更换为随机长密钥，并在 Astra 后端同步更新 [internal] secret 后重启。",
 			service.MinSecretLength)
 	}
-	if !cfg.Dev && cfg.TurnstileSecretKey == "" {
-		log.Println("[配置] 警告: 生产环境未设置 TURNSTILE_SECRET_KEY，注册请求将被拒绝（fail-closed）")
+	if !cfg.Dev {
+		log.Println("[配置] 人机验证: 由 ESA AI 验证码规则在边缘验签（需同时开启「拦截空Token请求」），本服务只校验验签参数是否携带")
 	}
 }
 

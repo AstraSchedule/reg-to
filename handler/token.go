@@ -16,8 +16,8 @@ func SignToken(deps *Deps) gin.HandlerFunc {
 			return
 		}
 
-		if err := deps.VerifyHuman(c, input.TurnstileToken); err != nil {
-			rejectHuman(c, err)
+		if err := deps.RequireCaptcha(c); err != nil {
+			rejectCaptcha(c, err)
 			return
 		}
 

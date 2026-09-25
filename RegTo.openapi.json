@@ -57,7 +57,7 @@
     "/api/sign-token": {
       "post": {
         "summary": "签发注册 JWT",
-        "description": "第一步：人机验证（Turnstile）通过后签发 JWT，有效期 10 分钟。\n\n生产环境未配置 `TURNSTILE_SECRET_KEY` 时直接拒绝（fail-closed），不会跳过人机验证。",
+        "description": "第一步：人机验证（ESA AI 验证码）通过后签发 JWT，有效期 10 分钟。\n\n验证由 ESA 在边缘完成：请求需携带验签参数（查询参数 `captcha_verify_param` 或请求头 `captcha-verify-param`，取值即前端回调的 `captchaVerifyParam`）。缺少参数时本服务直接拒绝（fail-closed）。",
         "operationId": "signToken",
         "tags": ["token"],
         "requestBody": {
@@ -73,8 +73,7 @@
                   "password": { "type": "string", "description": "管理员密码，8~128 字符" },
                   "school": { "type": "string", "description": "学校名称，1~32 字符" },
                   "grade": { "type": "string", "description": "年级名称，1~32 字符" },
-                  "class": { "type": "string", "description": "班级名称，1~32 字符" },
-                  "turnstile_token": { "type": "string", "description": "Cloudflare Turnstile 令牌；开发模式可为空" }
+                  "class": { "type": "string", "description": "班级名称，1~32 字符" }
                 }
               }
             }
@@ -155,8 +154,7 @@
                   "password": { "type": "string" },
                   "school": { "type": "string" },
                   "grade": { "type": "string" },
-                  "class": { "type": "string" },
-                  "turnstile_token": { "type": "string" }
+                  "class": { "type": "string" }
                 }
               }
             }
