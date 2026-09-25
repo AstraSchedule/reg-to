@@ -422,6 +422,61 @@ func TestESAExists(t *testing.T) {
 	}
 }
 
+// 备注里可能有人工补充的信息，写入时必须保留原文：只补标记，不改写已有说明。
+func TestESAEnsurePreservesExistingComment(t *testing.T) {
+	provider, fake := newFakeEsaProvider(t, config.ESAConfig{Target: "class.getastra.cn", Proxied: true})
+	seedEsa(t, fake, fakeEsaRecord{
+		RecordID:   1,
+		RecordName: "nj39.getastra.cn",
+		RecordType: "CNAME",
+		SourceType: "OP",
+		BizName:    "api",
+		Value:      "class.getastra.cn",
+		Proxied:    true,
+		TTL:        30,
+		Comment:    "SaaS 租户 nj39",
+	})
+
+	// 改目标触发一次写回
+	updated := provider.(*esaProvider)
+	updated.cfg.Target = "class2.getastra.cn"
+
+	results, err := updated.Ensure(context.Background(), "nj39")
+	if err != nil {
+		t.Fatalf("更新失败: %v", err)
+	}
+	if results[0].Action != ActionUpdated {
+		t.Fatalf("目标变化时应更新记录: %+v", results[0])
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if fake.records[0].Comment != "SaaS 租户 nj39" {
+		t.Fatalf("人工补充的备注被改写: %q", fake.records[0].Comment)
+	}
+}
+
+// 标记只在备注开头才算数："non-SaaS" 这类反向说明不能被当成租户标记。
+func TestHasTenantMarker(t *testing.T) {
+	cases := map[string]bool{
+		"SaaS":     true,
+		"saas":     true,
+		"SaaS 租户":  true,
+		"SaaS-租户":  true,
+		"  SaaS  ": true,
+		"":         false,
+		"non-SaaS": false,
+		"租户 SaaS":  false,
+		"SaaS租户":   false,
+	}
+
+	for comment, want := range cases {
+		if got := hasTenantMarker(comment); got != want {
+			t.Fatalf("hasTenantMarker(%q) = %v，期望 %v", comment, got, want)
+		}
+	}
+}
+
 func seedEsa(t *testing.T, fake *fakeEsaAPI, records ...fakeEsaRecord) {
 	t.Helper()
 	fake.mu.Lock()

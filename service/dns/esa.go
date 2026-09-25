@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"reg-to/config"
 
@@ -126,7 +128,7 @@ func (p *esaProvider) Ensure(ctx context.Context, subdomain string) ([]RecordRes
 		return []RecordResult{result}, nil
 	}
 
-	if _, err := p.client.UpdateRecord(p.updateRequest(derefInt64(existing.RecordId), target)); err != nil {
+	if _, err := p.client.UpdateRecord(p.updateRequest(derefInt64(existing.RecordId), target, tenantCommentFor(existing))); err != nil {
 		return nil, fmt.Errorf("更新 ESA 记录失败: %w", err)
 	}
 	result.Action = ActionUpdated
@@ -184,7 +186,10 @@ func (p *esaProvider) createRequest(fqdn, target string) *esa.CreateRecordReques
 }
 
 // updateRequest 构造更新记录的请求。
-func (p *esaProvider) updateRequest(recordID int64, target string) *esa.UpdateRecordRequest {
+//
+// comment 由调用方按已有备注计算（见 tenantCommentFor），不在这里写死标记 ——
+// 直接写死会把控制台上人工补充的备注抹掉。
+func (p *esaProvider) updateRequest(recordID int64, target, comment string) *esa.UpdateRecordRequest {
 	return (&esa.UpdateRecordRequest{}).
 		SetRecordId(recordID).
 		SetType("CNAME").
@@ -193,7 +198,7 @@ func (p *esaProvider) updateRequest(recordID int64, target string) *esa.UpdateRe
 		SetProxied(p.cfg.Proxied).
 		SetBizName(p.cfg.BizName).
 		SetSourceType(p.cfg.SourceType).
-		SetComment(TenantComment)
+		SetComment(comment)
 }
 
 // esaRecordValue 取出记录的目标值；Data 缺失时返回空串。
@@ -220,12 +225,39 @@ func (p *esaProvider) matchesDesired(existing *esa.ListRecordsResponseBodyRecord
 }
 
 // hasTenantComment 报告已有记录是否带租户备注标记。
-//
-// 按「包含」而不是相等：备注里可能有人工补充的说明（如「SaaS 租户」），
-// 系统端同样按包含判断，这里保持一致；空备注会在下一次 Ensure 时补上标记。
 func hasTenantComment(record *esa.ListRecordsResponseBodyRecords) bool {
-	return record != nil &&
-		strings.Contains(strings.ToLower(deref(record.Comment)), strings.ToLower(TenantComment))
+	return record != nil && hasTenantMarker(deref(record.Comment))
+}
+
+// hasTenantMarker 判断备注是否以租户标记开头，是便于单测的纯函数。
+//
+// 只认「标记出现在开头」：备注等于标记，或标记之后紧跟非字母数字字符（如「SaaS 租户」）。
+// 不用子串匹配，是因为 "non-SaaS" 这类反向说明会被误判成租户标记；
+// 系统端（sys-backend）用同一规则读取，两边必须保持一致。
+func hasTenantMarker(comment string) bool {
+	trimmed := strings.TrimSpace(comment)
+	if len(trimmed) < len(TenantComment) {
+		return false
+	}
+	if !strings.EqualFold(trimmed[:len(TenantComment)], TenantComment) {
+		return false
+	}
+	if len(trimmed) == len(TenantComment) {
+		return true
+	}
+	next, _ := utf8.DecodeRuneInString(trimmed[len(TenantComment):])
+	return !unicode.IsLetter(next) && !unicode.IsDigit(next)
+}
+
+// tenantCommentFor 返回写回记录时应使用的备注。
+//
+// 备注可能被人为补充过（如「SaaS 租户 nj39」），已有标记时原样保留，
+// 只在缺标记时补上，否则每次写入都会抹掉人工补充的信息。
+func tenantCommentFor(record *esa.ListRecordsResponseBodyRecords) string {
+	if hasTenantComment(record) {
+		return deref(record.Comment)
+	}
+	return TenantComment
 }
 
 // listAll 分页拉取站点内的全部 CNAME 记录，供批量改指使用。
@@ -329,7 +361,7 @@ func (p *esaProvider) Repoint(ctx context.Context, from string, dryRun bool) ([]
 			SetProxied(p.cfg.Proxied).
 			SetBizName(p.cfg.BizName).
 			SetSourceType(p.cfg.SourceType).
-			SetComment(TenantComment)
+			SetComment(tenantCommentFor(record))
 
 		if _, err := p.client.UpdateRecord(req); err != nil {
 			return results, fmt.Errorf("改指 %s 失败: %w", fqdn, err)
