@@ -179,7 +179,8 @@ func (p *esaProvider) createRequest(fqdn, target string) *esa.CreateRecordReques
 		SetTtl(int32(p.cfg.TTL)).
 		SetProxied(p.cfg.Proxied).
 		SetBizName(p.cfg.BizName).
-		SetSourceType(p.cfg.SourceType)
+		SetSourceType(p.cfg.SourceType).
+		SetComment(TenantComment)
 }
 
 // updateRequest 构造更新记录的请求。
@@ -191,7 +192,8 @@ func (p *esaProvider) updateRequest(recordID int64, target string) *esa.UpdateRe
 		SetTtl(int32(p.cfg.TTL)).
 		SetProxied(p.cfg.Proxied).
 		SetBizName(p.cfg.BizName).
-		SetSourceType(p.cfg.SourceType)
+		SetSourceType(p.cfg.SourceType).
+		SetComment(TenantComment)
 }
 
 // esaRecordValue 取出记录的目标值；Data 缺失时返回空串。
@@ -204,15 +206,26 @@ func esaRecordValue(record *esa.ListRecordsResponseBodyRecords) string {
 
 // matchesDesired 报告已有记录是否与期望状态一致。
 //
-// 期望状态包含目标值、代理开关、TTL、回源类型与业务场景五项；
+// 期望状态包含目标值、代理开关、TTL、回源类型、业务场景与租户备注标记六项；
 // 少比较任意一项都会让配置改动「看起来已生效」却实际没写入 ——
-// 例如把回源从普通域名改成源地址池（OP）、或把业务场景从 web 改成 api。
+// 例如把回源从普通域名改成源地址池（OP）、把业务场景从 web 改成 api，
+// 或者漏掉租户标记导致系统端认不出这条记录。
 func (p *esaProvider) matchesDesired(existing *esa.ListRecordsResponseBodyRecords, target string) bool {
 	return esaRecordValue(existing) == target &&
 		derefBool(existing.Proxied) == p.cfg.Proxied &&
 		derefInt64(existing.Ttl) == int64(p.cfg.TTL) &&
 		strings.EqualFold(deref(existing.RecordSourceType), p.cfg.SourceType) &&
-		strings.EqualFold(deref(existing.BizName), p.cfg.BizName)
+		strings.EqualFold(deref(existing.BizName), p.cfg.BizName) &&
+		hasTenantComment(existing)
+}
+
+// hasTenantComment 报告已有记录是否带租户备注标记。
+//
+// 按「包含」而不是相等：备注里可能有人工补充的说明（如「SaaS 租户」），
+// 系统端同样按包含判断，这里保持一致；空备注会在下一次 Ensure 时补上标记。
+func hasTenantComment(record *esa.ListRecordsResponseBodyRecords) bool {
+	return record != nil &&
+		strings.Contains(strings.ToLower(deref(record.Comment)), strings.ToLower(TenantComment))
 }
 
 // listAll 分页拉取站点内的全部 CNAME 记录，供批量改指使用。
@@ -315,7 +328,8 @@ func (p *esaProvider) Repoint(ctx context.Context, from string, dryRun bool) ([]
 			SetTtl(int32(p.cfg.TTL)).
 			SetProxied(p.cfg.Proxied).
 			SetBizName(p.cfg.BizName).
-			SetSourceType(p.cfg.SourceType)
+			SetSourceType(p.cfg.SourceType).
+			SetComment(TenantComment)
 
 		if _, err := p.client.UpdateRecord(req); err != nil {
 			return results, fmt.Errorf("改指 %s 失败: %w", fqdn, err)

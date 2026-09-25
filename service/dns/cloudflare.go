@@ -231,7 +231,7 @@ func (p *cloudflareProvider) Repoint(ctx context.Context, from string, dryRun bo
 			"content": target,
 			"proxied": p.cfg.Proxied,
 			"ttl":     p.cfg.EffectiveTTL(),
-			"comment": "SaaS",
+			"comment": TenantComment,
 		}
 		path := fmt.Sprintf("/zones/%s/dns_records/%s", url.PathEscape(p.cfg.ZoneID), url.PathEscape(record.ID))
 		if _, err := p.do(ctx, http.MethodPut, path, payload); err != nil {
@@ -281,7 +281,7 @@ func (p *cloudflareProvider) Ensure(ctx context.Context, subdomain string) ([]Re
 		"content": target,
 		"proxied": p.cfg.Proxied,
 		"ttl":     ttl,
-		"comment": "SaaS",
+		"comment": TenantComment,
 	}
 
 	existing, err := p.findRecord(ctx, fqdn)

@@ -143,6 +143,8 @@ export ALI_ESA_BIZ_NAME="api"            # 加速业务场景：image_video / ap
 export ALI_ESA_SOURCE_TYPE="OP"          # 回源类型：OP（源地址池，推荐）/ Domain / OSS / S3 / LB
 export ALI_ESA_PUBLIC="true"             # 是否作为对用户可见的访问地址
 export ALI_ESA_TTL="30"                  # 合法范围 1~86400，越界会被拒绝并回退默认值
+# 本服务创建的记录会带上备注 "SaaS"（TenantComment）。系统端 sys-backend 靠这个标记
+# 把租户记录与 class/to/sys 等基础设施记录区分开，改动它之前必须两个服务一起改。
 export ALI_ESA_ENDPOINT="esa.cn-hangzhou.aliyuncs.com"
 export ALI_ESA_PROTOCOL=""               # 留空使用 HTTPS；私有化 endpoint 可填 http
 

@@ -21,6 +21,12 @@ import (
 // httpTimeout 是单个 DNS 服务商单次 API 调用的超时时间。
 const httpTimeout = 20 * time.Second
 
+// TenantComment 是租户 DNS 记录的备注标记。
+//
+// 站点里既有租户记录，也有 class/to/sys 这类基础设施记录，系统端（sys-backend）
+// 依赖这个标记把两者区分开，因此两个服务写入的值必须保持一致。
+const TenantComment = "SaaS"
+
 // httpClient 是所有服务商共用的、带超时的 HTTP 客户端。
 var httpClient = &http.Client{Timeout: httpTimeout}
 
