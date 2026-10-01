@@ -100,11 +100,11 @@ func TestValidateAstraAPIBase(t *testing.T) {
 }
 
 // 后端在 ESA WAF 之后，非标 UA 会被挑战页拦下（2026-09-30 线上复现：
-// Go 默认的 Go-http-client/1.1 拿到质询 HTML，AstraSchedule/Reg 才到得了后端），
-// 所以每个后端请求都必须带注册站标识。
+// Go 默认的 Go-http-client/1.1 拿到质询 HTML，AstraSchedule/System 才到得了后端），
+// 所以每个后端请求都必须带机器到机器调用标识。
 func TestBackendRequestsCarryWebUserAgent(t *testing.T) {
-	if WebUserAgent != "AstraSchedule/Reg" {
-		t.Fatalf("注册站对后端的标识应为 AstraSchedule/Reg，当前为 %q", WebUserAgent)
+	if WebUserAgent != "AstraSchedule/System" {
+		t.Fatalf("服务端对后端的标识应为 AstraSchedule/System，当前为 %q", WebUserAgent)
 	}
 
 	var got string
