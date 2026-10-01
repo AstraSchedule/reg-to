@@ -27,6 +27,13 @@ const (
 	maxResponseBytes = 1 << 20
 )
 
+// WebUserAgent 是注册站服务端调用 Astra 后端时的 User-Agent。
+//
+// 后端在 ESA + WAF 之后，WAF 用 UA 区分「我们自己的服务」与自动化扫描：
+// Go 默认的 Go-http-client/1.1 不在放行名单里，会被非标 UA 挑战拦下，
+// 租户创建与子域名校验都会失败（2026-09-30 线上复现），因此后端调用统一带这个标识。
+const WebUserAgent = "AstraWeb/Reg"
+
 // NoRedirect 拒绝所有 HTTP 重定向。
 //
 // 调用 Astra 后端时会带上 X-Internal-Secret，注册请求体里还有管理员口令；
@@ -112,12 +119,11 @@ func CreateTenant(ctx context.Context, cfg *config.Config, input TenantRequest) 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Internal-Secret", cfg.AstraAPISecret)
 
-	transport, err := BuildMTLSTransport(cfg)
+	client, err := NewAstraBackendClient(cfg, tenantTimeout)
 	if err != nil {
 		return err
 	}
 
-	client := &http.Client{Timeout: tenantTimeout, Transport: transport, CheckRedirect: NoRedirect}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("请求 Astra 后端失败: %w", err)
@@ -140,10 +146,44 @@ func CreateTenant(ctx context.Context, cfg *config.Config, input TenantRequest) 
 	return nil
 }
 
-// BuildMTLSTransport 构造带客户端证书的 HTTP Transport。
+// backendUserAgentTransport 给每一次后端请求补上 User-Agent。
+//
+// 放在 RoundTripper 而不是每个调用点上，是为了让「所有对后端的请求都带标识」
+// 这条约束由构造点保证：以后新增调用点不会漏掉请求头。
+type backendUserAgentTransport struct {
+	base http.RoundTripper
+}
+
+// RoundTrip 克隆请求后写入 User-Agent，再把请求交给底层 Transport。
+//
+// 按 http.RoundTripper 的约定，实现不能改动传入的请求，因此这里先克隆。
+func (t backendUserAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	clone := req.Clone(req.Context())
+	clone.Header.Set("User-Agent", WebUserAgent)
+	return t.base.RoundTrip(clone)
+}
+
+// NewAstraBackendClient 构造访问 Astra 后端内部接口的 HTTP 客户端。
+//
+// mTLS Transport、拒绝重定向、UA 标识都在这里统一装配：调用方不再各自拼装
+// http.Client，也就不会漏掉其中任何一项。
+func NewAstraBackendClient(cfg *config.Config, timeout time.Duration) (*http.Client, error) {
+	transport, err := buildMTLSTransport(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &http.Client{
+		Timeout:       timeout,
+		Transport:     backendUserAgentTransport{base: transport},
+		CheckRedirect: NoRedirect,
+	}, nil
+}
+
+// buildMTLSTransport 构造带客户端证书的 HTTP Transport。
 //
 // 未配置证书时返回普通 Transport，由调用方决定是否接受这种降级。
-func BuildMTLSTransport(cfg *config.Config) (*http.Transport, error) {
+func buildMTLSTransport(cfg *config.Config) (*http.Transport, error) {
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
 			Timeout:   dialTimeout,

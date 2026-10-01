@@ -45,7 +45,7 @@ func NewDeps(cfg *config.Config) (*Deps, error) {
 		return nil, err
 	}
 
-	transport, err := service.BuildMTLSTransport(cfg)
+	backend, err := service.NewAstraBackendClient(cfg, backendTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func NewDeps(cfg *config.Config) (*Deps, error) {
 	return &Deps{
 		Config:  cfg,
 		DNS:     manager,
-		Backend: &http.Client{Timeout: backendTimeout, Transport: transport, CheckRedirect: service.NoRedirect},
+		Backend: backend,
 	}, nil
 }
 
