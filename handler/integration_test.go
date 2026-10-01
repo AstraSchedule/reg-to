@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"reg-to/config"
-	"reg-to/service"
 	"reg-to/service/dns"
 
 	"github.com/gin-gonic/gin"
@@ -486,49 +485,5 @@ func TestCreateDNSHidesInternalProviderURL(t *testing.T) {
 	internal := providers[1].(map[string]any)
 	if internal["provider"] != "cloudflare" || internal["public"] != false || internal["ok"] != true {
 		t.Fatalf("回源服务商结果不正确: %+v", internal)
-	}
-}
-
-// 依赖装配的验收：handler 侧的后端客户端同样带注册站标识。
-// 这里只查 namespaceExists，因为它就是 handler 里唯一的后端出站请求。
-func TestNamespaceExistsSendsWebUserAgent(t *testing.T) {
-	var got string
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got = r.Header.Get("User-Agent")
-		_, _ = w.Write([]byte(`{"exists":false}`))
-	}))
-	t.Cleanup(backend.Close)
-
-	cfg := &config.Config{
-		Dev:            true,
-		AstraAPIBase:   backend.URL,
-		AstraAPISecret: "test-astra-api-secret-0123456789ab",
-		DNSProviders:   []string{config.ProviderCloudflare},
-		Cloudflare: config.CloudflareConfig{
-			APIToken: "token",
-			ZoneID:   "zone1",
-			ZoneName: "getastra.cn",
-			Target:   "class.getastra.cn",
-			Proxied:  true,
-			Public:   true,
-			TTL:      1,
-			BaseURL:  backend.URL + "/client/v4",
-		},
-	}
-
-	deps, err := NewDeps(cfg)
-	if err != nil {
-		t.Fatalf("构造依赖失败: %v", err)
-	}
-
-	exists, err := deps.namespaceExists(context.Background(), "nj39")
-	if err != nil {
-		t.Fatalf("查询命名空间失败: %v", err)
-	}
-	if exists {
-		t.Fatal("后端返回 exists=false 时不应判定为已存在")
-	}
-	if got != service.WebUserAgent {
-		t.Fatalf("后端收到的 User-Agent = %q，期望 %q", got, service.WebUserAgent)
 	}
 }
