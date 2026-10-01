@@ -32,7 +32,9 @@ const (
 // 后端在 ESA + WAF 之后，WAF 用 UA 区分「我们自己的服务」与自动化扫描：
 // Go 默认的 Go-http-client/1.1 不在放行名单里，会被非标 UA 挑战拦下，
 // 租户创建与子域名校验都会失败（2026-09-30 线上复现），因此后端调用统一带这个标识。
-const WebUserAgent = "AstraWeb/Reg"
+// 线上 WAF 的放行名单只认 AstraSchedule 前缀（与桌面客户端、sys-backend 同族），
+// AstraWeb 前缀已不再放行，因此这里用 AstraSchedule/Reg。
+const WebUserAgent = "AstraSchedule/Reg"
 
 // NoRedirect 拒绝所有 HTTP 重定向。
 //
